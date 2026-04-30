@@ -122,6 +122,10 @@
         let isMicOn = true, isCamOn = true, currentFacingMode = "user";
         let partnerMicOn = true, partnerCamOn = true;
         let callStartTime, callTimerInterval, startX = 0;
+        
+        // BIẾN CHO HEARTBEAT
+        let lastHeartbeatTime = 0;
+        let heartbeatInterval;
 
         function confirmIdentity() {
             const input = document.getElementById('user-id-input').value;
@@ -187,6 +191,19 @@
                 document.getElementById('status-text').innerText = `Cuộc gọi video ( ${timeStr} )`;
                 document.getElementById('status-text').style.color = "#fff";
             }, 1000);
+            
+            // BẮT ĐẦU GỬI HEARTBEAT KHI VÀO CUỘC GỌI
+            lastHeartbeatTime = Date.now();
+            heartbeatInterval = setInterval(() => {
+                if(dataConn && dataConn.open) {
+                    dataConn.send({type: 'KEEP_ALIVE'});
+                }
+                // KIỂM TRA NẾU QUÁ 8 GIÂY KHÔNG CÓ PHẢN HỒI THÌ THOÁT
+                if(Date.now() - lastHeartbeatTime > 8000) {
+                    console.log("Mất kết nối với đối phương!");
+                    location.reload();
+                }
+            }, 3000);
         }
 
         function makeCall() {
@@ -225,6 +242,12 @@
 
         function setupDataHandlers() {
             dataConn.on('data', data => {
+                // XỬ LÝ HEARTBEAT NHẬN ĐƯỢC
+                if(data.type === 'KEEP_ALIVE') {
+                    lastHeartbeatTime = Date.now();
+                    return;
+                }
+                
                 if(data.type === 'CHAT') appendMsg(data.text, 'partner');
                 if(data.type === 'WATCH') startWatching(data.url);
                 if(data.type === 'END') location.reload();
@@ -347,28 +370,5 @@
 
         function hangUp() { if(dataConn) dataConn.send({type:'END'}); location.reload(); }
     </script>
-	<link rel="manifest" href="/manifest.json">
-<script>
-    // Đăng ký Service Worker
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-            navigator.serviceWorker.register('/sw.js');
-        });
-    }
-
-    // Hàm xin quyền thông báo khi người dùng nhấn "Kiểm tra"
-    function requestNotificationPermission() {
-        if (Notification.permission !== 'granted') {
-            Notification.requestPermission();
-        }
-    }
-    
-    // Sửa lại hàm confirmIdentity sẵn có của bạn
-    const originalConfirm = confirmIdentity;
-    confirmIdentity = function() {
-        requestNotificationPermission(); // Xin quyền ngay khi đăng nhập
-        originalConfirm();
-    };
-</script>
 </body>
 </html>
